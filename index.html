@@ -92,6 +92,28 @@ function setProgress(p,m){document.getElementById('progress').style.display=p>0?
 async function startTranscribe(){
   let url=document.getElementById('urlInput').value.trim(); if(!url) return alert('Paste URL first');
   let plat=detectPlatform(url); document.getElementById('detected').textContent='Detected: '+plat;
+  setProgress(10,'Getting audio + transcript via Cobalt + Whisper...');
+  try{
+    let res=await fetch('/.netlify/functions/transcriber-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    let d=await res.json(); if(!res.ok) throw new Error(d.error||'Cobalt failed');
+    // NEW: backend already did 【entity-Whisper¦canonical_name=Whisper】 for us, just show it
+    if(d.transcript){
+      document.getElementById('transcript').value=d.transcript; updateCount(); setProgress(100,'Done ✓ - AI transcribed audio'); saveHistory(url,plat); return;
+    }
+    // OLD fallback: if backend ever returns audioUrl instead
+    if(d.audioUrl){
+      setProgress(30,'Downloading AUDIO ONLY...');
+      let audioRes=await fetch(d.audioUrl); let blob=await audioRes.blob();
+      setProgress(60,'Sending audio to Whisper AI...');
+      const reader=new FileReader(); reader.readAsDataURL(blob);
+      reader.onloadend=async()=>{ try{ let wr=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:reader.result})}); let w=await wr.json(); if(!w.text) throw new Error(w.error||'Whisper failed'); document.getElementById('transcript').value=w.text; updateCount(); setProgress(100,'Done ✓ - AI transcribed audio'); saveHistory(url,plat); }catch(e){ setProgress(0,'【entity-Whisper¦canonical_name=Whisper】 failed: '+e.message); alert('【entity-Whisper¦canonical_name=Whisper】 failed: '+e.message); } };
+      return;
+    }
+    throw new Error(d.error || d.message || 'No transcript returned');
+  }catch(e){ setProgress(0,'Audio pull failed: '+e.message); alert('Audio pull failed: '+e.message+'\n\nTry Captions or Voice Note / Upload.'); }
+}
+  let url=document.getElementById('urlInput').value.trim(); if(!url) return alert('Paste URL first');
+  let plat=detectPlatform(url); document.getElementById('detected').textContent='Detected: '+plat;
   setProgress(10,'Getting audio link via Cobalt (audio-only, no video)...');
   try{
     let res=await fetch('/.netlify/functions/transcriber-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
