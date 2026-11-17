@@ -1,15 +1,18 @@
-exports.handler = async (event) => {
-  const headers = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST, OPTIONS", "Content-Type": "application/json" };
-  if (event.httpMethod === "OPTIONS") return { statusCode: 200, headers, body: "" };
-  try {
-    const { url } = JSON.parse(event.body || "{}");
-    if (!url) return { statusCode: 400, headers, body: JSON.stringify({ error: "No URL" }) };
-    const cobaltRes = await fetch("https://api.cobalt.tools/api/json", {
-      method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ url, downloadMode: "audio", filenameStyle: "basic" })
+export async function handler(event){
+  const headers = { 'Content-Type':'application/json', 'Access-Control-Allow-Origin':'*' };
+  try{
+    if(event.httpMethod==='OPTIONS') return { statusCode:200, headers, body:'{}' };
+    const { url } = JSON.parse(event.body||'{}');
+    if(!url) return { statusCode:400, headers, body: JSON.stringify({ error:'No URL provided' }) };
+    const cobalt = await fetch('https://api.cobalt.tools/api/json', {
+      method:'POST',
+      headers:{ 'Accept':'application/json','Content-Type':'application/json' },
+      body: JSON.stringify({ url, downloadMode:'audio', audioFormat:'mp3' })
     });
-    const cobalt = await cobaltRes.json();
-    if (!cobalt.url) return { statusCode: 400, headers, body: JSON.stringify({ error: "Cobalt could not get audio. Try Captions or Upload. " + (cobalt.text || "") }) };
-    return { statusCode: 200, headers, body: JSON.stringify({ audioUrl: cobalt.url, filename: cobalt.filename || "audio.mp3" }) };
-  } catch(e){ return { statusCode: 500, headers, body: JSON.stringify({ error: e.message }) }; }
-};
+    const data = await cobalt.json().catch(()=>({}));
+    if(data.url) return { statusCode:200, headers, body: JSON.stringify({ audioUrl:data.url, picker:data.picker }) };
+    return { statusCode:200, headers, body: JSON.stringify({ error:'No audio extracted - no direct audio found', useCaptions:true }) };
+  }catch(e){
+    return { statusCode:200, headers, body: JSON.stringify({ error:e.message, useCaptions:true }) };
+  }
+}
