@@ -55,10 +55,8 @@ body.mini #miniStatus{display:block}
 </div>
 </div>
 <div id="page-history" class="hidden"><div class="wrap"><div class="card"><h3>History — URLs + Voice Notes</h3><div id="history">No transcriptions yet.</div></div></div></div>
-
 <div id="buddy"><div id="buddyBubble"><div class="wLetter">W</div><div class="waveBars"><i></i><i></i><i></i><i></i><i></i></div><div class="mic">🎙️</div></div><span>🎙️ Wave Buddy</span></div>
 <div id="miniStatus"></div>
-
 <div id="buddyMenu"><b>💎 Wave Buddy</b>
 <button onclick="closeBuddyMenu();openBuddyChat()">💬 Speak to AI</button>
 <button onclick="closeBuddyMenu();toggleVoiceNote()">🎙️ Record Voice Note</button>
@@ -66,13 +64,18 @@ body.mini #miniStatus{display:block}
 <button onclick="closeBuddyMenu();leaveApp()">✕ Leave / Exit</button>
 <button onclick="document.getElementById('buddy').style.display='none';closeBuddyMenu();setStatus('Buddy hidden. Refresh to bring it back.')">🙈 Hide Buddy</button>
 </div>
-
 <div id="buddyChat"><b>💎 Wave Buddy AI</b> <button style="float:right;background:none;border:none;color:#fff" onclick="openBuddyChat()">✕</button><div id="buddyLog">Hi, I'm Wave Buddy ✨ Paste a YouTube link and tap Get Captions, or tap Voice Note and talk.</div><input id="buddyInput" placeholder="Ask about this transcript..." style="width:100%;background:#0f0f1f;color:#fff;border:1px solid #ffffff22;border-radius:12px;padding:11px;margin-top:8px"><div class="row" style="margin-top:8px"><button class="primary" onclick="askBuddy()">Ask Buddy</button><button onclick="summarizeWithBuddy()">✨ Summarize</button><button class="rec" id="buddyRecordBtn" onclick="toggleVoiceNote()">🎙️ Voice Note</button></div></div>
-
 <div id="leftScreen"><h1 style="font-size:40px">🌊 Wavelord</h1><p>You left Wavelord. Your work is saved in History.</p><button style="background:#D4AF37;color:#000;font-weight:800;padding:12px 20px;border:none;border-radius:12px;cursor:pointer" onclick="document.getElementById('leftScreen').classList.remove('show')">↩ Back to Wavelord</button></div>
-
 <script>
 let lastText="", mediaRecorder=null, chunks=[], isRecording=false;
+// YOUR REAL FILE NAMES - FIXED:
+// transcriber-captions.js -> /transcriber-captions
+// transcriber.js -> /transcriber  (voice + upload)
+// ai.js -> /ai  (already correct)
+// transcriber-url.js -> NOT USED ANYMORE, we do captions-first
+const FN_CAPTIONS = '/.netlify/functions/transcriber-captions';
+const FN_TRANSCRIBE = '/.netlify/functions/transcriber';
+const FN_AI = '/.netlify/functions/ai';
 function showPage(n){document.getElementById('leftScreen').classList.remove('show');['home','history'].forEach(p=>document.getElementById('page-'+p).classList.toggle('hidden',p!==n)); if(n==='history')renderHistory();}
 function isNative(){ return typeof AndroidMini !== 'undefined'; }
 function isOverlay(){ const q=new URLSearchParams(location.search); return q.get('overlay')==='1' || q.get('mode')==='mini'; }
@@ -82,23 +85,18 @@ function leaveApp(){ if(isNative()){ try{ AndroidMini.exit(); return; }catch(e){
 function closeBuddyMenu(){document.getElementById('buddyMenu').classList.remove('open');}
 function openBuddyChat(){ document.getElementById('buddyChat').classList.toggle('open'); closeBuddyMenu(); }
 function setStatus(t){document.getElementById('status').textContent=t; let m=document.getElementById('miniStatus'); if(m) m.textContent=t.slice(0,60);}
-
-// BUDDY FIX - THE WAY YOU WANT IT:
-// Normal mode: single tap = NOTHING, double-tap = open menu (so it doesn't pop up by accident)
-// Mini mode: single tap = OPEN menu, you choose Record / Back / Exit
-(function(){ let el=document.getElementById('buddy'), x=0,y=0,sx=0,sy=0,dragging=false,moved=false,lastTap=0;
+// BUDDY - FINAL RULE YOU WANTED:
+// Landing page: tap = NOTHING. Buddy is just there, drag him out of the way.
+// Mini ONLY: tap = OPEN menu, you choose Record / Back / Exit
+(function(){ let el=document.getElementById('buddy'), x=0,y=0,sx=0,sy=0,dragging=false,moved=false;
   const openMenu=()=>{ const m=document.getElementById('buddyMenu'); const r=el.getBoundingClientRect(); m.style.left=Math.max(8,r.left-130)+'px'; m.style.top=Math.max(8,r.top-230)+'px'; m.classList.toggle('open'); };
   const start=(e)=>{const p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; const r=el.getBoundingClientRect(); x=r.left; y=r.top; dragging=true; moved=false;};
   const move=(e)=>{if(!dragging)return; const p=e.touches?e.touches[0]:e; const dx=p.clientX-sx, dy=p.clientY-sy; if(Math.abs(dx)>6||Math.abs(dy)>6)moved=true; el.style.left=(x+dx)+'px'; el.style.top=(y+dy)+'px'; el.style.right='auto'; el.style.bottom='auto';};
-  const end=()=>{ dragging=false; if(moved) return;
-    if(document.body.classList.contains('mini')){ openMenu(); return; }
-    const now=Date.now(); if(now-lastTap<400){ openMenu(); lastTap=0; } else { lastTap=now; }
-  };
+  const end=()=>{ dragging=false; if(moved) return; if(document.body.classList.contains('mini')){ openMenu(); } };
   el.addEventListener('touchstart',start,{passive:true}); el.addEventListener('touchmove',move,{passive:true}); el.addEventListener('touchend',end);
   el.addEventListener('mousedown',start); window.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
 })();
 if(isOverlay()) document.body.classList.add('mini');
-
 async function toggleVoiceNote(){
   if(!isRecording){
     try{ const s=await navigator.mediaDevices.getUserMedia({audio:true}); mediaRecorder=new MediaRecorder(s); chunks=[]; mediaRecorder.ondataavailable=e=>chunks.push(e.data); mediaRecorder.onstop=sendVoiceNote; mediaRecorder.start(); isRecording=true; document.body.classList.add('recording'); document.getElementById('mainRecordBtn').textContent='■ STOP Voice Note'; document.getElementById('buddyRecordBtn').textContent='■ STOP'; setStatus('Listening... Tap again to stop.'); }catch(e){ setStatus('Mic blocked: '+e.message); }
@@ -106,36 +104,32 @@ async function toggleVoiceNote(){
 }
 async function sendVoiceNote(){
   const blob=new Blob(chunks,{type:'audio/webm'}); const reader=new FileReader(); reader.readAsDataURL(blob);
-  reader.onloadend=async()=>{ try{ const res=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:reader.result})}); const data=await res.json(); const text=data.text||data.transcript||''; if(!text) throw new Error(data.error||'No text back'); document.getElementById('transcript').value=text; updateCount(); saveHistory('Voice Note • '+new Date().toLocaleString(), 'Voice Note'); setStatus('Voice Note transcribed ✓'); document.getElementById('buddyLog').textContent+='\n\nVoice Note: '+text; }catch(e){ setStatus('Transcribe failed: '+e.message); } };
+  reader.onloadend=async()=>{ try{ const res=await fetch(FN_TRANSCRIBE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:reader.result})}); const raw=await res.text(); let data; try{data=JSON.parse(raw);}catch(e){throw new Error('Transcriber function not found. Check netlify/functions/transcriber.js is deployed.');} const text=data.text||data.transcript||''; if(!text) throw new Error(data.error||'No text back'); document.getElementById('transcript').value=text; updateCount(); saveHistory('Voice Note • '+new Date().toLocaleString(), 'Voice Note'); setStatus('Voice Note transcribed ✓'); document.getElementById('buddyLog').textContent+='\n\nVoice Note: '+text; }catch(e){ setStatus('Transcribe failed: '+e.message); alert('Voice Note failed: '+e.message); } };
 }
 function detectPlatform(u){ if(u.includes('youtube')||u.includes('youtu.be'))return 'YouTube'; if(u.includes('rumble'))return 'Rumble'; if(u.includes('odysee'))return 'Odysee'; if(u.includes('bitchute'))return 'BitChute'; if(u.includes('vimeo'))return 'Vimeo'; return 'Podcast / Link'; }
 function setProgress(p,m){document.getElementById('progress').style.display=p>0?'block':'none'; document.getElementById('progressFill').style.width=p+'%'; setStatus(m||'');}
-
-// CAPTIONS FIRST - FIXED to work with your captions.js
-// Your file returns {text, captions} - we accept BOTH
 async function useCaptions(){
   let url=document.getElementById('urlInput').value.trim(); if(!url) return alert('Paste YouTube URL first');
   let plat=detectPlatform(url); document.getElementById('detected').textContent='Detected: '+plat+' • Trying captions first...';
   setProgress(20,'Getting YouTube captions...');
   try{
-    let res=await fetch('/.netlify/functions/captions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
-    let d=await res.json();
+    let res=await fetch(FN_CAPTIONS,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    let raw=await res.text(); let d; try{d=JSON.parse(raw);}catch(e){ throw new Error('Captions function not found. Check netlify/functions/transcriber-captions.js is deployed.'); }
     if(!res.ok) throw new Error(d.error||'No captions found');
     let captionText = d.text || d.captions;
     if(!captionText) throw new Error(d.error||'This video has no captions. Try Upload instead.');
     document.getElementById('transcript').value=captionText; updateCount(); setProgress(100,'Done ✓ - Captions pulled'); saveHistory(url,plat+' Captions'); setStatus('Captions pulled ✓ - Now tap Summarize');
-  }catch(e){ setProgress(0,'Captions failed: '+e.message); alert('Captions failed: '+e.message+'\n\nThis video may have captions turned OFF. Try another YouTube video that has captions, or use Upload.'); }
+  }catch(e){ setProgress(0,'Captions failed: '+e.message); alert('Captions failed: '+e.message); }
 }
 async function startTranscribe(){ return useCaptions(); }
-
-function handleFile(inp){ let f=inp.files[0]; if(!f) return; document.getElementById('detected').textContent='File: '+f.name+' • '+(f.size/1024/1024).toFixed(1)+' MB'; setProgress(40,'Uploading to Whisper...'); const r=new FileReader(); r.readAsDataURL(f); r.onloadend=async()=>{ try{ let res=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:r.result})}); let d=await res.json(); let t=d.text||d.transcript||''; if(!t) throw new Error(d.error||'No text'); document.getElementById('transcript').value=t; updateCount(); setProgress(100,'Done ✓'); saveHistory(f.name,'Upload'); }catch(e){ setProgress(0,'Upload failed: '+e.message); } }; }
+function handleFile(inp){ let f=inp.files[0]; if(!f) return; document.getElementById('detected').textContent='File: '+f.name+' • '+(f.size/1024/1024).toFixed(1)+' MB'; setProgress(40,'Uploading to Whisper...'); const r=new FileReader(); r.readAsDataURL(f); r.onloadend=async()=>{ try{ let res=await fetch(FN_TRANSCRIBE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:r.result})}); let raw=await res.text(); let d; try{d=JSON.parse(raw);}catch(e){throw new Error('Transcriber function not found.');} let t=d.text||d.transcript||''; if(!t) throw new Error(d.error||'No text'); document.getElementById('transcript').value=t; updateCount(); setProgress(100,'Done ✓'); saveHistory(f.name,'Upload'); }catch(e){ setProgress(0,'Upload failed: '+e.message); alert('Upload failed: '+e.message); } }; }
 function updateCount(){ let t=document.getElementById('transcript').value; let w=t.trim()?t.trim().split(/\s+/).length:0; document.getElementById('wordCount').textContent=w+' words'; lastText=t; }
 document.getElementById('transcript').addEventListener('input',updateCount);
 function copyTranscript(){ navigator.clipboard.writeText(document.getElementById('transcript').value).then(()=>alert('Copied!')); }
 function downloadTranscript(){ let b=new Blob([document.getElementById('transcript').value],{type:'text/plain'}); let a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='wavelord-transcript.txt'; a.click(); }
-async function callAI(prompt){ document.getElementById('aiResult').textContent='🤖 GPT-OSS thinking...'; try{ let res=await fetch('/.netlify/functions/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt, model:'openai/gpt-oss-120b'})}); let d=await res.json(); document.getElementById('aiResult').textContent=d.answer||d.text||d.reply||JSON.stringify(d); }catch(e){ document.getElementById('aiResult').textContent='AI not connected.'; } }
+async function callAI(prompt){ document.getElementById('aiResult').textContent='🤖 GPT-OSS thinking...'; try{ let res=await fetch(FN_AI,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt, model:'openai/gpt-oss-120b'})}); let raw=await res.text(); let d; try{d=JSON.parse(raw);}catch(e){throw new Error('AI function not found.');} document.getElementById('aiResult').textContent=d.answer||d.text||d.reply||JSON.stringify(d); }catch(e){ document.getElementById('aiResult').textContent='AI failed: '+e.message; } }
 async function aiAction(p){ let t=document.getElementById('transcript').value; if(!t.trim()) return alert('Get captions first'); await callAI(p+'\n\nTRANSCRIPT:\n'+t.slice(0,12000)); }
-async function askBuddy(){ let q=document.getElementById('buddyInput').value.trim(); if(!q) q='What is this transcript about?'; let t=document.getElementById('transcript').value.slice(0,8000); document.getElementById('buddyLog').textContent+='\n\nYou: '+q; document.getElementById('buddyInput').value=''; try{ let res=await fetch('/.netlify/functions/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q+'\n\nTRANSCRIPT:\n'+t, model:'openai/gpt-oss-120b'})}); let d=await res.json(); document.getElementById('buddyLog').textContent+='\n\nBuddy: '+(d.answer||d.text||d.reply); }catch(e){ document.getElementById('buddyLog').textContent+='\n\nFailed: '+e.message; } }
+async function askBuddy(){ let q=document.getElementById('buddyInput').value.trim(); if(!q) q='What is this transcript about?'; let t=document.getElementById('transcript').value.slice(0,8000); document.getElementById('buddyLog').textContent+='\n\nYou: '+q; document.getElementById('buddyInput').value=''; try{ let res=await fetch(FN_AI,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q+'\n\nTRANSCRIPT:\n'+t, model:'openai/gpt-oss-120b'})}); let raw=await res.text(); let d; try{d=JSON.parse(raw);}catch(e){throw new Error('AI function not found.');} document.getElementById('buddyLog').textContent+='\n\nBuddy: '+(d.answer||d.text||d.reply); }catch(e){ document.getElementById('buddyLog').textContent+='\n\nFailed: '+e.message; } }
 async function summarizeWithBuddy(){ document.getElementById('buddyInput').value='Summarize this transcript in 5 bullets'; askBuddy(); }
 let blocksEl=document.getElementById('blocks');
 function addBlock(type,text=''){ let div=document.createElement('div'); div.className='block'; if(type==='toggle'){ div.className='block toggle-block open'; div.innerHTML='<div class="toggle-head" onclick="this.parentElement.classList.toggle(\'open\')"><span style="color:#D4AF37">▼</span><div contenteditable="true" style="flex:1">'+(text||'Untitled Toggle')+'</div></div><div class="toggle-body"><div class="block" contenteditable="true">Notes inside toggle...</div></div>'; } else if(type==='h2'){ div.innerHTML='<div contenteditable="true" style="font-size:20px;font-weight:900">'+(text||'Heading')+'</div>'; } else if(type==='todo'){ div.innerHTML='<div class="todo"><input type="checkbox"><div contenteditable="true" style="flex:1">'+(text||'To-do')+'</div></div>'; } else { div.innerHTML='<div contenteditable="true">'+(text||'Type here...')+'</div>'; } div.addEventListener('keydown',e=>{ if(e.key==='Backspace'&&div.textContent.trim()===''){ e.preventDefault(); div.remove(); } if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); addBlock('text'); blocksEl.lastChild.querySelector('[contenteditable]').focus(); } }); blocksEl.appendChild(div); }
