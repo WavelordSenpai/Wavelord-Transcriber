@@ -1,59 +1,35 @@
 name: Build APK
-
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
+        with: { distribution: 'temurin', java-version: '17' }
       - name: Download Gradle DIRECT
         run: |
           curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.2-bin.zip
           unzip -q gradle.zip
           ./gradle-8.2/bin/gradle --version
-
-      - name: Assemble Android project from YOUR layout
+      - name: Assemble from YOUR layout
         run: |
           mkdir -p app/src/main/java/com/wavelord/transcriber
           mkdir -p app/src/main/assets/public
-          mkdir -p app/src/main/res/mipmap-xxxhdpi
-          mkdir -p app/src/main/res/mipmap-xxhdpi
-          mkdir -p app/src/main/res/mipmap-xhdpi
-          mkdir -p app/src/main/res/mipmap-hdpi
-          mkdir -p app/src/main/res/mipmap-mdpi
-          # YOUR files - copied, NOT moved
+          mkdir -p app/src/main/res/mipmap-xxxhdpi app/src/main/res/mipmap-xxhdpi app/src/main/res/mipmap-xhdpi app/src/main/res/mipmap-hdpi app/src/main/res/mipmap-mdpi
           cp overlay/MainActivity.java app/src/main/java/com/wavelord/transcriber/MainActivity.java
           cp overlay/FloatingBuddy.java app/src/main/java/com/wavelord/transcriber/FloatingBuddy.java
           cp index.html app/src/main/assets/public/index.html
-          # YOUR icon - from root icon.png
           if [ -f icon.png ]; then
-            echo "Found icon.png - using your gold W"
-            cp icon.png app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-            cp icon.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-            cp icon.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
-            cp icon.png app/src/main/res/mipmap-hdpi/ic_launcher.png
-            cp icon.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+            for d in xxxhdpi xxhdpi xhdpi hdpi mdpi; do cp icon.png app/src/main/res/mipmap-$d/ic_launcher.png; done
           else
-            echo "No icon.png found - using tiny built-in PNG, NO Pillow needed"
-            # 1x1 black PNG in base64 - no PIL, no pip, no install
-            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-            cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-            cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
-            cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-hdpi/ic_launcher.png
-            cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+            echo "[STRIPPED 96 bytes]" | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+            for d in xxhdpi xhdpi hdpi mdpi; do cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-$d/ic_launcher.png; done
           fi
-          # Manifest
           cat > app/src/main/AndroidManifest.xml << 'XML'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.wavelord.transcriber">
@@ -71,7 +47,6 @@ jobs:
               </application>
           </manifest>
           XML
-          # FIXED Gradle files - NO buildscript, NO old syntax
           cat > settings.gradle << 'GR'
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
@@ -84,20 +59,31 @@ jobs:
           cat > app/build.gradle << 'GR'
           plugins { id 'com.android.application' }
           android {
-            namespace 'com.wavelord.transcriber'
-            compileSdk 34
-            defaultConfig { applicationId 'com.wavelord.transcriber'; minSdk 24; targetSdk 34; versionCode 1; versionName '1.0' }
-            buildTypes { debug { minifyEnabled false } release { minifyEnabled false } }
-            compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+              namespace 'com.wavelord.transcriber'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.wavelord.transcriber'
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+              buildTypes {
+                  debug {
+                      minifyEnabled false
+                  }
+                  release {
+                      minifyEnabled false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
           }
           GR
-          ls -R app/src/main
-
       - name: Build Debug APK
         run: ./gradle-8.2/bin/gradle assembleDebug --stacktrace
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        with:
-          name: wavelord-transcriber-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+        with: { name: wavelord-transcriber-apk, path: app/build/outputs/apk/debug/app-debug.apk }
