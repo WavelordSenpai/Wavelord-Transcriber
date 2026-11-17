@@ -17,14 +17,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Download Gradle DIRECT (no gradlew needed)
+      - name: Download Gradle DIRECT
         run: |
           curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.2-bin.zip
           unzip -q gradle.zip
-          ls gradle-8.2/bin/gradle
           ./gradle-8.2/bin/gradle --version
 
-      - name: Assemble Android project from YOUR layout (overlay/ + index.html + icon.png)
+      - name: Assemble Android project from YOUR layout
         run: |
           mkdir -p app/src/main/java/com/wavelord/transcriber
           mkdir -p app/src/main/assets/public
@@ -33,22 +32,22 @@ jobs:
           mkdir -p app/src/main/res/mipmap-xhdpi
           mkdir -p app/src/main/res/mipmap-hdpi
           mkdir -p app/src/main/res/mipmap-mdpi
-          # YOUR Java files
+          # YOUR files - copied, NOT moved
           cp overlay/MainActivity.java app/src/main/java/com/wavelord/transcriber/MainActivity.java
           cp overlay/FloatingBuddy.java app/src/main/java/com/wavelord/transcriber/FloatingBuddy.java
-          # YOUR web app
           cp index.html app/src/main/assets/public/index.html
-          # YOUR icon - direct from root icon.png
+          # YOUR icon - from root icon.png
           if [ -f icon.png ]; then
-            echo "Found icon.png at root - using it"
+            echo "Found icon.png - using your gold W"
             cp icon.png app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
             cp icon.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png
             cp icon.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
             cp icon.png app/src/main/res/mipmap-hdpi/ic_launcher.png
             cp icon.png app/src/main/res/mipmap-mdpi/ic_launcher.png
           else
-            echo "No icon.png found - creating fallback so build does not fail"
-            python3 -c "from PIL import Image; Image.new('RGB',(512,512),(10,10,10)).save('app/src/main/res/mipmap-xxxhdpi/ic_launcher.png')"
+            echo "No icon.png found - using tiny built-in PNG, NO Pillow needed"
+            # 1x1 black PNG in base64 - no PIL, no pip, no install
+            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==" | base64 -d > app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
             cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png
             cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
             cp app/src/main/res/mipmap-xxxhdpi/ic_launcher.png app/src/main/res/mipmap-hdpi/ic_launcher.png
@@ -72,11 +71,15 @@ jobs:
               </application>
           </manifest>
           XML
-          # Gradle files
-          echo "include ':app'" > settings.gradle
+          # FIXED Gradle files - NO buildscript, NO old syntax
+          cat > settings.gradle << 'GR'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name = 'Wavelord-Transcriber'
+          include ':app'
+          GR
           cat > build.gradle << 'GR'
-          buildscript { repositories { google(); mavenCentral() } dependencies { classpath 'com.android.application:8.2.0' } }
-          allprojects { repositories { google(); mavenCentral() } }
+          plugins { id 'com.android.application' version '8.2.0' apply false }
           GR
           cat > app/build.gradle << 'GR'
           plugins { id 'com.android.application' }
@@ -90,7 +93,7 @@ jobs:
           GR
           ls -R app/src/main
 
-      - name: Build Debug APK - DIRECT Gradle
+      - name: Build Debug APK
         run: ./gradle-8.2/bin/gradle assembleDebug --stacktrace
 
       - name: Upload APK
