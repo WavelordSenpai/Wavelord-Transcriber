@@ -22,8 +22,18 @@ textarea{width:100%;min-height:220px;background:#000;color:#E8E0C8;border:1px so
 .todo{display:flex;gap:8px;align-items:center} .todo input{width:18px;height:18px;accent-color:#D4AF37}
 .hidden{display:none!important}
 #buddy{position:fixed;right:14px;bottom:14px;z-index:50;text-align:center;touch-action:none;cursor:grab}
-#buddyBubble{width:76px;height:76px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #FFE88A, #D4AF37 55%, #8A6D00);border:2px solid #FFE88A;display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 8px 30px #000;pointer-events:none}
-#buddy span{display:block;font-size:12px;background:#000000aa;padding:4px 8px;border-radius:999px;margin-top:2px;pointer-events:none}
+#buddyBubble{width:82px;height:82px;border-radius:50%;background:radial-gradient(circle at 30% 25%, #FFE88A, #D4AF37 45%, #7A5C00 80%, #2A2000);border:3px solid #FFE88A;display:flex;align-items:center;justify-content:center;flex-direction:column;box-shadow:0 0 0 4px #000, 0 0 25px #D4AF37aa, 0 10px 30px #000;position:relative;overflow:hidden;pointer-events:none}
+#buddyBubble .wLetter{font-family:Georgia,serif;font-weight:900;font-size:38px;line-height:1;color:#0A0A0A;text-shadow:0 1px 0 #FFE88A, 0 2px 6px #00000055;margin-top:-4px}
+#buddyBubble .waveBars{display:flex;gap:3px;align-items:flex-end;height:14px;margin-top:2px}
+#buddyBubble .waveBars i{display:block;width:3px;background:#0A0A0A;border-radius:99px}
+#buddyBubble .waveBars i:nth-child(1){height:5px} #buddyBubble .waveBars i:nth-child(2){height:10px} #buddyBubble .waveBars i:nth-child(3){height:14px} #buddyBubble .waveBars i:nth-child(4){height:10px} #buddyBubble .waveBars i:nth-child(5){height:5px}
+#buddyBubble .mic{font-size:11px;line-height:1;margin-top:1px}
+#buddy span{display:block;font-size:11px;font-weight:800;background:#000000cc;color:#D4AF37;padding:4px 9px;border-radius:999px;margin-top:4px;border:1px solid #D4AF37;pointer-events:none}
+body.recording #buddyBubble{border-color:#ff3b5c;box-shadow:0 0 0 4px #000, 0 0 30px #ff3b5c, 0 10px 30px #000;animation:pulseRed .8s infinite}
+body.recording #buddyBubble .wLetter{color:#ff3b5c}
+body.recording #buddyBubble .waveBars i{animation:waveBounce .5s infinite alternate;background:#ff3b5c}
+body.recording #buddyBubble .waveBars i:nth-child(2){animation-delay:.1s} body.recording #buddyBubble .waveBars i:nth-child(3){animation-delay:.2s} body.recording #buddyBubble .waveBars i:nth-child(4){animation-delay:.1s}
+@keyframes waveBounce{from{height:4px}to{height:16px}} @keyframes pulseRed{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
 #buddyMenu{position:fixed;z-index:51;background:#1a1a2e;border:1px solid #D4AF37;border-radius:16px;padding:10px;width:230px;display:none;box-shadow:0 10px 40px #000}
 #buddyMenu.open{display:block} #buddyMenu button{display:block;width:100%;text-align:left;background:#2a2a45;color:#fff;border:none;padding:11px;border-radius:10px;margin:5px 0;cursor:pointer;font-size:14px}
 #buddyChat{position:fixed;right:14px;bottom:100px;width:min(92vw,360px);z-index:52;background:#15152a;border:1px solid #D4AF37;border-radius:18px;padding:12px;display:none}
@@ -45,7 +55,7 @@ body.mini #miniStatus{display:block}
 </div>
 </div>
 <div id="page-history" class="hidden"><div class="wrap"><div class="card"><h3>History — URLs + Voice Notes</h3><div id="history">No transcriptions yet.</div></div></div></div>
-<div id="buddy"><div id="buddyBubble">💎</div><span>Wave Buddy</span></div>
+<div id="buddy"><div id="buddyBubble"><div class="wLetter">W</div><div class="waveBars"><i></i><i></i><i></i><i></i><i></i></div><div class="mic">🎙️</div></div><span>🎙️ Wave Buddy</span></div>
 <div id="miniStatus"></div>
 <div id="buddyMenu"><b>💎 Wave Buddy</b><button onclick="closeBuddyMenu();openBuddyChat()">💬 Speak to AI</button><button onclick="closeBuddyMenu();toggleVoiceNote()">🎙️ Record Voice Note</button><button onclick="closeBuddyMenu();reenterApp()">🏠 Re-enter App</button><button onclick="closeBuddyMenu();leaveApp()">✕ Leave / Exit</button></div>
 <div id="buddyChat"><b>💎 Wave Buddy AI</b> <button style="float:right;background:none;border:none;color:#fff" onclick="openBuddyChat()">✕</button><div id="buddyLog">Hi, I'm Wave Buddy ✨ Paste a link, or tap Voice Note and talk.</div><input id="buddyInput" placeholder="Ask about this transcript..." style="width:100%;background:#0f0f1f;color:#fff;border:1px solid #ffffff22;border-radius:12px;padding:11px;margin-top:8px"><div class="row" style="margin-top:8px"><button class="primary" onclick="askBuddy()">Ask Buddy</button><button onclick="summarizeWithBuddy()">✨ Summarize</button><button class="rec" id="buddyRecordBtn" onclick="toggleVoiceNote()">🎙️ Voice Note</button></div></div>
@@ -70,8 +80,8 @@ function setStatus(t){document.getElementById('status').textContent=t; document.
 if(isOverlay()) document.body.classList.add('mini');
 async function toggleVoiceNote(){
   if(!isRecording){
-    try{ const s=await navigator.mediaDevices.getUserMedia({audio:true}); mediaRecorder=new MediaRecorder(s); chunks=[]; mediaRecorder.ondataavailable=e=>chunks.push(e.data); mediaRecorder.onstop=sendVoiceNote; mediaRecorder.start(); isRecording=true; document.getElementById('mainRecordBtn').textContent='■ STOP Voice Note'; document.getElementById('buddyRecordBtn').textContent='■ STOP'; setStatus('Listening... Tap again to stop.'); }catch(e){ setStatus('Mic blocked: '+e.message); }
-  } else { mediaRecorder.stop(); isRecording=false; document.getElementById('mainRecordBtn').textContent='🎙️ Voice Note'; document.getElementById('buddyRecordBtn').textContent='🎙️ Voice Note'; setStatus('Transcribing voice note...'); }
+    try{ const s=await navigator.mediaDevices.getUserMedia({audio:true}); mediaRecorder=new MediaRecorder(s); chunks=[]; mediaRecorder.ondataavailable=e=>chunks.push(e.data); mediaRecorder.onstop=sendVoiceNote; mediaRecorder.start(); isRecording=true; document.body.classList.add('recording'); document.getElementById('mainRecordBtn').textContent='■ STOP Voice Note'; document.getElementById('buddyRecordBtn').textContent='■ STOP'; setStatus('Listening... Tap again to stop.'); }catch(e){ setStatus('Mic blocked: '+e.message); }
+  } else { mediaRecorder.stop(); isRecording=false; document.body.classList.remove('recording'); document.getElementById('mainRecordBtn').textContent='🎙️ Voice Note'; document.getElementById('buddyRecordBtn').textContent='🎙️ Voice Note'; setStatus('Transcribing voice note...'); }
 }
 async function sendVoiceNote(){
   const blob=new Blob(chunks,{type:'audio/webm'}); const reader=new FileReader(); reader.readAsDataURL(blob);
@@ -79,23 +89,22 @@ async function sendVoiceNote(){
 }
 function detectPlatform(u){ if(u.includes('youtube')||u.includes('youtu.be'))return 'YouTube'; if(u.includes('rumble'))return 'Rumble'; if(u.includes('odysee'))return 'Odysee'; if(u.includes('bitchute'))return 'BitChute'; if(u.includes('vimeo'))return 'Vimeo'; return 'Podcast / Link'; }
 function setProgress(p,m){document.getElementById('progress').style.display=p>0?'block':'none'; document.getElementById('progressFill').style.width=p+'%'; setStatus(m||'');}
-// COBALT AUDIO-ONLY - NO VIDEO DOWNLOAD
 async function startTranscribe(){
   let url=document.getElementById('urlInput').value.trim(); if(!url) return alert('Paste URL first');
   let plat=detectPlatform(url); document.getElementById('detected').textContent='Detected: '+plat;
   setProgress(10,'Getting audio link via Cobalt (audio-only, no video)...');
   try{
-    let res=await fetch('/.netlify/functions/transcribe-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    let res=await fetch('/.netlify/functions/transcriber-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
     let d=await res.json(); if(!res.ok) throw new Error(d.error||'Cobalt failed');
     setProgress(30,'Downloading AUDIO ONLY (MP3, ~5-10MB, not video)...');
     let audioRes=await fetch(d.audioUrl); let blob=await audioRes.blob();
-    setProgress(60,'Sending audio to 【entity-Whisper AI¦canonical_name=Whisper】...');
+    setProgress(60,'Sending audio to Whisper AI...');
     const reader=new FileReader(); reader.readAsDataURL(blob);
-    reader.onloadend=async()=>{ try{ let wr=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:reader.result})}); let w=await wr.json(); if(!w.text) throw new Error(w.error||'【entity-Whisper¦canonical_name=Whisper】 failed'); document.getElementById('transcript').value=w.text; updateCount(); setProgress(100,'Done ✓ - AI transcribed audio'); saveHistory(url,plat); }catch(e){ setProgress(0,'【entity-Whisper¦canonical_name=Whisper】 failed: '+e.message); alert('【entity-Whisper¦canonical_name=Whisper】 failed: '+e.message); } };
-  }catch(e){ setProgress(0,'Audio pull failed: '+e.message+' - Trying captions...'); alert('Audio pull failed: '+e.message+'\n\nTry Captions or Voice Note / Upload.'); }
+    reader.onloadend=async()=>{ try{ let wr=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:reader.result})}); let w=await wr.json(); if(!w.text) throw new Error(w.error||'Whisper failed'); document.getElementById('transcript').value=w.text; updateCount(); setProgress(100,'Done ✓ - AI transcribed audio'); saveHistory(url,plat); }catch(e){ setProgress(0,'Whisper failed: '+e.message); alert('Whisper failed: '+e.message); } };
+  }catch(e){ setProgress(0,'Audio pull failed: '+e.message); alert('Audio pull failed: '+e.message+'\n\nTry Captions or Voice Note / Upload.'); }
 }
 function useCaptions(){ setStatus('Captions: backend will fetch YouTube captions for this URL.'); }
-function handleFile(inp){ let f=inp.files[0]; if(!f) return; document.getElementById('detected').textContent='File: '+f.name+' • '+(f.size/1024/1024).toFixed(1)+' MB'; setProgress(40,'Uploading to 【entity-Whisper¦canonical_name=Whisper】...'); const r=new FileReader(); r.readAsDataURL(f); r.onloadend=async()=>{ try{ let res=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:r.result})}); let d=await res.json(); document.getElementById('transcript').value=d.text||''; updateCount(); setProgress(100,'Done ✓'); saveHistory(f.name,'Upload'); }catch(e){ setProgress(0,'Upload failed: '+e.message); } }; }
+function handleFile(inp){ let f=inp.files[0]; if(!f) return; document.getElementById('detected').textContent='File: '+f.name+' • '+(f.size/1024/1024).toFixed(1)+' MB'; setProgress(40,'Uploading to Whisper...'); const r=new FileReader(); r.readAsDataURL(f); r.onloadend=async()=>{ try{ let res=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:r.result})}); let d=await res.json(); document.getElementById('transcript').value=d.text||''; updateCount(); setProgress(100,'Done ✓'); saveHistory(f.name,'Upload'); }catch(e){ setProgress(0,'Upload failed: '+e.message); } }; }
 function updateCount(){ let t=document.getElementById('transcript').value; let w=t.trim()?t.trim().split(/\s+/).length:0; document.getElementById('wordCount').textContent=w+' words'; lastText=t; }
 document.getElementById('transcript').addEventListener('input',updateCount);
 function copyTranscript(){ navigator.clipboard.writeText(document.getElementById('transcript').value).then(()=>alert('Copied!')); }
