@@ -1,0 +1,7 @@
+{
+  "name": "wavelord-transcriber",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "dev": "npx netlify dev", "build": "echo 'No build - static HTML + Netlify Functions'" },
+  "dependencies": {}
+}
