@@ -15,8 +15,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Create Gradle files - you don't have to make these
+      - name: Create Gradle files
         run: |
+          mkdir -p app
           cat > settings.gradle << 'EOF'
           pluginManagement {
               repositories {
@@ -71,7 +72,6 @@ jobs:
           }
           EOF
 
-          echo "--- CHECK FILES WERE MADE ---"
           ls -la settings.gradle build.gradle app/build.gradle
 
       - name: Copy web + overlay into Android project
