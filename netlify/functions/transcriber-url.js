@@ -1,11 +1,11 @@
 // netlify/functions/transcriber-url.js
 // NO KEY NEEDED VERSION - public Cobalt instance built in
-// Flow stays INSIDE Wavelord: URL -> Cobalt API (background) -> MP3 -> 【entity-Whisper¦canonical_name=Whisper】 -> Transcript
+// Flow stays INSIDE Wavelord: URL -> Cobalt API (background) -> MP3 -> Whisper -> Transcript
 
 exports.handler = async (event) => {
   // If you later add COBALT_API_URL in Netlify, it will use yours.
   // If you don't, it uses this free public one - no key needed.
-  const COBALT_URL = process.env.COBALT_API_URL || 'https://co.wuk.sh';
+  const COBALT_URL = process.env.COBALT_API_URL || 'https://cobalt-backend.canine.tools';
   const COBALT_KEY = process.env.COBALT_API_KEY || ''; // empty = OK for public
 
   try{
