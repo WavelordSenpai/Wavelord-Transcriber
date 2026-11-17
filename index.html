@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wavelord Transcriber</title>
+<style>
+*{box-sizing:border-box} body{margin:0;background:#0A0A0A;color:#F5F0E6;font-family:system-ui,sans-serif}
+.nav{position:sticky;top:0;z-index:20;display:flex;gap:8px;align-items:center;padding:12px 14px;background:rgba(10,10,20,.9);border-bottom:1px solid #ffffff22}
+.nav button{background:#1a1a2e;color:#fff;border:1px solid #ffffff22;padding:8px 12px;border-radius:999px;cursor:pointer}
+.hero{text-align:center;padding:20px 16px;background:radial-gradient(600px 300px at 50% 0%,#D4AF3755,transparent)}
+.hero h1{font-size:32px} .hero h1 span{color:#D4AF37}
+.badges{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.badge{border:1px solid #333;padding:5px 10px;border-radius:999px;font-size:11px}
+.wrap{max-width:700px;margin:0 auto;padding:14px} .card{background:#15152a;border:1px solid #ffffff1a;border-radius:18px;padding:14px;margin:12px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap} .row button{background:#2a2a45;color:#fff;border:1px solid #ffffff22;padding:9px 12px;border-radius:10px;cursor:pointer} .row button.primary{background:#D4AF37;color:#000;font-weight:800}
+input[type=text]{width:100%;background:#000;color:#fff;border:1px solid #ffffff22;border-radius:12px;padding:12px;margin-top:8px}
+textarea{width:100%;min-height:220px;background:#000;color:#E8E0C8;border:1px solid #333;border-radius:12px;padding:12px;font-size:14px;line-height:1.7}
+#progress{height:6px;background:#222;border-radius:999px;margin-top:10px;overflow:hidden;display:none} #progressFill{height:100%;background:#D4AF37;width:0%}
+#status{font-size:12px;color:#D4AF37;margin-top:6px}
+.block{border:1px solid transparent;border-radius:10px;padding:7px 9px;margin-top:6px} .block:hover{border-color:#222}
+.toggle-head{cursor:pointer;display:flex;gap:8px;align-items:center;font-weight:800} .toggle-body{display:none;padding:7px 0 3px 20px} .toggle-block.open .toggle-body{display:block}
+.todo{display:flex;gap:8px;align-items:center} .todo input{width:18px;height:18px;accent-color:#D4AF37}
+.hidden{display:none!important}
+/* SINGLE DRAGGABLE WAVE BUDDY */
+#buddy{position:fixed;right:14px;bottom:14px;z-index:50;text-align:center;touch-action:none;cursor:grab}
+#buddyBubble{width:76px;height:76px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #FFE88A, #D4AF37 55%, #8A6D00);border:2px solid #FFE88A;display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 8px 30px #000;pointer-events:none}
+#buddy span{display:block;font-size:12px;background:#000000aa;padding:4px 8px;border-radius:999px;margin-top:2px;pointer-events:none}
+#buddyMenu{position:fixed;z-index:51;background:#1a1a2e;border:1px solid #D4AF37;border-radius:16px;padding:10px;width:220px;display:none;box-shadow:0 10px 40px #000}
+#buddyMenu.open{display:block} #buddyMenu button{display:block;width:100%;text-align:left;background:#2a2a45;color:#fff;border:none;padding:11px;border-radius:10px;margin:5px 0;cursor:pointer;font-size:14px}
+#buddyChat{position:fixed;right:14px;bottom:100px;width:min(92vw,360px);z-index:52;background:#15152a;border:1px solid #D4AF37;border-radius:18px;padding:12px;display:none}
+#buddyChat.open{display:block} #buddyLog{max-height:200px;overflow:auto;background:#0f0f1f;border-radius:12px;padding:10px;white-space:pre-wrap;margin-bottom:8px;font-size:14px}
+body.mini .nav, body.mini .hero, body.mini .wrap, body.mini #buddyMenu, body.mini #buddyChat{display:none}
+#miniStatus{position:fixed;left:14px;bottom:100px;z-index:49;background:#000000aa;padding:6px 10px;border-radius:999px;font-size:12px;display:none}
+body.mini #miniStatus{display:block}
+</style>
+</head>
+<body>
+<div class="nav"><b>🌊 Wavelord</b><button onclick="showPage('home')">Home</button><button onclick="showPage('history')">History</button><button onclick="enterMini()">💎 Minimize</button></div>
+
+<div id="page-home">
+<div class="hero"><h1>Wavelord <span>Transcriber</span></h1><p>Paste any link. Get transcript. Get summary. No Llama — GPT-OSS only.</p><div class="badges"><span class="badge">▶ YouTube</span><span class="badge">Rumble</span><span class="badge">Odysee</span><span class="badge">BitChute</span><span class="badge">Vimeo</span><span class="badge">🎙 Podcast</span><span class="badge">📁 Upload</span></div></div>
+<div class="wrap">
+<div class="card"><label>Paste URL</label><input id="urlInput" type="text" placeholder="https://youtube.com/watch?v=... or https://rumble.com/..."><div class="row" style="margin-top:10px"><button class="primary" onclick="startTranscribe()">✨ Transcribe</button><button onclick="useCaptions()">📄 Captions First</button><label style="background:#2a2a45;padding:9px 12px;border-radius:10px;cursor:pointer">📁 Upload<input type="file" id="fileInput" accept="audio/*,video/*" style="display:none" onchange="handleFile(this)"></label></div><div id="progress"><div id="progressFill"></div></div><div id="status"></div><div id="detected" style="font-size:11px;color:#888;margin-top:6px"></div></div>
+<div class="card"><label>Transcript — Editable</label><div class="row" style="margin-top:8px"><button class="primary" onclick="aiAction('Summarize this transcript in 5 bullet points')">✨ Summarize</button><button onclick="aiAction('Give me key points + action items')">📌 Key Points</button><button onclick="copyTranscript()">📋 Copy</button><button onclick="downloadTranscript()">⬇ Download</button></div><textarea id="transcript" placeholder="Transcript will appear here..."></textarea><div id="wordCount" style="font-size:11px;color:#888">0 words</div></div>
+<div class="card"><label>Notes — Notion Toggles</label><p style="font-size:11px;color:#666">Click ▶ to open/close. Enter = new block. Backspace on empty = delete.</p><div id="blocks"></div><div class="row"><button onclick="addBlock('toggle')">+ ▶ Toggle</button><button onclick="addBlock('h2')">+ H2</button><button onclick="addBlock('todo')">+ ☐ To-Do</button><button onclick="addBlock('text')">+ Text</button></div></div>
+<div class="card"><label>AI Result — GPT-OSS</label><div id="aiResult" style="white-space:pre-wrap;font-size:14px;line-height:1.7;margin-top:8px">AI summary will appear here...</div></div>
+</div>
+</div>
+<div id="page-history" class="hidden"><div class="wrap"><div class="card"><h3>History</h3><div id="history">No transcriptions yet.</div></div></div></div>
+
+<!-- SINGLE DRAGGABLE WAVE BUDDY -->
+<div id="buddy"><div id="buddyBubble">💎</div><span>Wave Buddy</span></div>
+<div id="miniStatus"></div>
+<div id="buddyMenu">
+<b>💎 Wave Buddy</b>
+<button onclick="closeBuddyMenu();openBuddyChat()">💬 Speak to AI</button>
+<button onclick="closeBuddyMenu();reenterApp()">🏠 Re-enter App</button>
+<button onclick="closeBuddyMenu();leaveApp()">✕ Leave / Exit</button>
+</div>
+<div id="buddyChat"><b>💎 Wave Buddy AI</b> <button style="float:right;background:none;border:none;color:#fff" onclick="openBuddyChat()">✕</button><div id="buddyLog">Hi, I'm Wave Buddy ✨ Paste a link and I'll transcribe + summarize it.</div><input id="buddyInput" placeholder="Ask about this transcript..." style="width:100%;background:#0f0f1f;color:#fff;border:1px solid #ffffff22;border-radius:12px;padding:11px;margin-top:8px"><div class="row" style="margin-top:8px"><button class="primary" onclick="askBuddy()">Ask Buddy</button><button onclick="summarizeWithBuddy()">✨ Summarize Transcript</button></div></div>
+
+<script>
+let lastText="";
+function showPage(n){['home','history'].forEach(p=>document.getElementById('page-'+p).classList.toggle('hidden',p!==n)); if(n==='history')renderHistory();}
+function isNative(){ return typeof AndroidMini !== 'undefined'; }
+function isOverlay(){ const q=new URLSearchParams(location.search); return q.get('overlay')==='1' || q.get('mode')==='mini'; }
+
+// === MINIMIZE INTO WAVE BUDDY / RE-ENTER / LEAVE - ONLY 3 OPTIONS IN MENU ===
+function enterMini(){
+  if(isNative() && !isOverlay()){ try{ AndroidMini.minimize(); return; }catch(e){} }
+  document.body.classList.add('mini');
+  try{ if(isNative()) AndroidMini.setWindowSize(200,260); }catch(e){}
+}
+function reenterApp(){
+  if(isOverlay() && isNative()){ try{ AndroidMini.expand(); return; }catch(e){} }
+  document.body.classList.remove('mini');
+  try{ if(isNative()) AndroidMini.setWindowSize(520,800); }catch(e){}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function leaveApp(){
+  if(isNative()){ try{ AndroidMini.exit(); return; }catch(e){} }
+  if(confirm('Leave Wavelord Transcriber?')) window.close();
+}
+function closeBuddyMenu(){document.getElementById('buddyMenu').classList.remove('open');}
+function openBuddyChat(){
+  document.getElementById('buddyChat').classList.toggle('open'); closeBuddyMenu();
+  try{ if(isNative()){ AndroidMini.setChatOpen(document.getElementById('buddyChat').classList.contains('open')); AndroidMini.setMiniChatOpen(document.getElementById('buddyChat').classList.contains('open')); } }catch(e){}
+}
+function setStatus(t){document.getElementById('status').textContent=t; document.getElementById('miniStatus').textContent=t.slice(0,60);}
+
+// === DRAGGABLE BUDDY - TAP vs DRAG ===
+(function(){
+  let el=document.getElementById('buddy'), x=0,y=0,sx=0,sy=0,dragging=false,moved=false;
+  const start=(e)=>{const p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; const r=el.getBoundingClientRect(); x=r.left; y=r.top; dragging=true; moved=false;};
+  const move=(e)=>{if(!dragging)return; const p=e.touches?e.touches[0]:e; const dx=p.clientX-sx, dy=p.clientY-sy; if(Math.abs(dx)>6||Math.abs(dy)>6)moved=true; el.style.left=(x+dx)+'px'; el.style.top=(y+dy)+'px'; el.style.right='auto'; el.style.bottom='auto';};
+  const end=()=>{dragging=false; if(!moved){ const m=document.getElementById('buddyMenu'); const r=el.getBoundingClientRect(); m.style.left=Math.max(8,r.left-130)+'px'; m.style.top=Math.max(8,r.top-230)+'px'; m.classList.toggle('open'); }};
+  el.addEventListener('touchstart',start,{passive:true}); el.addEventListener('touchmove',move,{passive:true}); el.addEventListener('touchend',end);
+  el.addEventListener('mousedown',start); window.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+})();
+if(isOverlay()) document.body.classList.add('mini');
+
+// === TRANSCRIBE ===
+function detectPlatform(u){ if(u.includes('youtube')||u.includes('youtu.be'))return 'YouTube'; if(u.includes('rumble'))return 'Rumble'; if(u.includes('odysee'))return 'Odysee'; if(u.includes('bitchute'))return 'BitChute'; if(u.includes('vimeo'))return 'Vimeo'; return 'Podcast / Link'; }
+function setProgress(p,m){document.getElementById('progress').style.display=p>0?'block':'none'; document.getElementById('progressFill').style.width=p+'%'; setStatus(m||'');}
+async function startTranscribe(){ let url=document.getElementById('urlInput').value.trim(); if(!url) return alert('Paste URL first'); let plat=detectPlatform(url); document.getElementById('detected').textContent='Detected: '+plat; setProgress(15,'Connecting to '+plat+'...'); try{ let res=await fetch('/.netlify/functions/transcribe-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})}); let d=await res.json(); if(!res.ok) throw new Error(d.error||'failed'); setProgress(90,'Transcribing...'); document.getElementById('transcript').value=d.transcript||d.text||''; updateCount(); setProgress(100,'Done ✓'); saveHistory(url,plat); }catch(e){ setProgress(0,'Backend not connected or video blocked — try Captions First or Upload.'); alert('Transcribe failed: '+e.message+'\n\nTry Captions First or Upload file.'); } }
+function useCaptions(){ setStatus('Captions: backend will fetch YouTube captions for this URL.'); }
+function handleFile(inp){ let f=inp.files[0]; if(!f) return; document.getElementById('detected').textContent='File: '+f.name+' • '+(f.size/1024/1024).toFixed(1)+' MB'; setProgress(40,'Uploading to 【entity-Whisper¦canonical_name=Whisper】...'); const r=new FileReader(); r.readAsDataURL(f); r.onloadend=async()=>{ try{ let res=await fetch('/.netlify/functions/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:r.result})}); let d=await res.json(); document.getElementById('transcript').value=d.text||''; updateCount(); setProgress(100,'Done ✓'); }catch(e){ setProgress(0,'Upload failed: '+e.message); } }; }
+function updateCount(){ let t=document.getElementById('transcript').value; let w=t.trim()?t.trim().split(/\s+/).length:0; document.getElementById('wordCount').textContent=w+' words'; lastText=t; }
+document.getElementById('transcript').addEventListener('input',updateCount);
+function copyTranscript(){ navigator.clipboard.writeText(document.getElementById('transcript').value).then(()=>alert('Copied!')); }
+function downloadTranscript(){ let b=new Blob([document.getElementById('transcript').value],{type:'text/plain'}); let a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='wavelord-transcript.txt'; a.click(); }
+async function callAI(prompt){ document.getElementById('aiResult').textContent='🤖 GPT-OSS thinking...'; try{ let res=await fetch('/.netlify/functions/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt, model:'openai/gpt-oss-120b'})}); let d=await res.json(); document.getElementById('aiResult').textContent=d.answer||d.text||d.reply||JSON.stringify(d); }catch(e){ document.getElementById('aiResult').textContent='AI not connected.'; } }
+async function aiAction(p){ let t=document.getElementById('transcript').value; if(!t.trim()) return alert('Transcribe first'); await callAI(p+'\n\nTRANSCRIPT:\n'+t.slice(0,12000)); }
+async function askBuddy(){ let q=document.getElementById('buddyInput').value.trim(); if(!q) q='What is this transcript about?'; let t=document.getElementById('transcript').value.slice(0,8000); document.getElementById('buddyLog').textContent+='\n\nYou: '+q; document.getElementById('buddyInput').value=''; try{ let res=await fetch('/.netlify/functions/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q+'\n\nTRANSCRIPT:\n'+t, model:'openai/gpt-oss-120b'})}); let d=await res.json(); document.getElementById('buddyLog').textContent+='\n\nBuddy: '+(d.answer||d.text||d.reply); }catch(e){ document.getElementById('buddyLog').textContent+='\n\nFailed: '+e.message; } }
+async function summarizeWithBuddy(){ document.getElementById('buddyInput').value='Summarize this transcript in 5 bullets'; askBuddy(); }
+let blocksEl=document.getElementById('blocks');
+function addBlock(type,text=''){ let div=document.createElement('div'); div.className='block'; if(type==='toggle'){ div.className='block toggle-block open'; div.innerHTML='<div class="toggle-head" onclick="this.parentElement.classList.toggle(\'open\')"><span style="color:#D4AF37">▼</span><div contenteditable="true" style="flex:1">'+(text||'Untitled Toggle')+'</div></div><div class="toggle-body"><div class="block" contenteditable="true">Notes inside toggle...</div></div>'; } else if(type==='h2'){ div.innerHTML='<div contenteditable="true" style="font-size:20px;font-weight:900">'+(text||'Heading')+'</div>'; } else if(type==='todo'){ div.innerHTML='<div class="todo"><input type="checkbox"><div contenteditable="true" style="flex:1">'+(text||'To-do')+'</div></div>'; } else { div.innerHTML='<div contenteditable="true">'+(text||'Type here...')+'</div>'; } div.addEventListener('keydown',e=>{ if(e.key==='Backspace'&&div.textContent.trim()===''){ e.preventDefault(); div.remove(); } if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); addBlock('text'); blocksEl.lastChild.querySelector('[contenteditable]').focus(); } }); blocksEl.appendChild(div); }
+addBlock('toggle','🎥 Video Info — Title / Creator'); addBlock('toggle','📝 My Notes'); addBlock('todo','Timestamp key moment');
+function saveHistory(url,plat){ let h=JSON.parse(localStorage.getItem('wavelordTranscripts')||'[]'); h.unshift({url,plat,date:new Date().toLocaleString(),text:document.getElementById('transcript').value.slice(0,150)}); localStorage.setItem('wavelordTranscripts',JSON.stringify(h.slice(0,20))); renderHistory(); }
+function renderHistory(){ let h=JSON.parse(localStorage.getItem('wavelordTranscripts')||'[]'); if(!h.length) return; document.getElementById('history').innerHTML=h.map(x=>'<div style="border:1px solid #222;border-radius:12px;padding:10px;margin-top:8px"><b>'+x.plat+'</b> • '+x.date+'<br>'+x.url.slice(0,60)+'</div>').join(''); }
+renderHistory();
+</script></body></html>
